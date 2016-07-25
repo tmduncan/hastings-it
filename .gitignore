@@ -18,5 +18,5 @@ build
 .gradle
 
 # Site
-site-it/site-it
+hstSite/hstSite
 *.zip

@@ -1,0 +1,200 @@
+defaultTasks 'build'
+
+
+
+
+ext.spec = [
+        appName   : "hstApp",
+        gdxVersion: "1.0-SNAPSHOT",
+        versions  : [
+
+                //NOTE:  Versions are managed by Spring IO for interoperability.
+                //       If its not included in Spring IO's version management  ( CHECK HERE: http://docs.spring.io/platform/docs/2.0.6.RELEASE/reference/htmlsingle/ )
+                //       OR
+                //       If there's a specific version of something it needs to be added here
+                JMOCKIT_VERSION              : '1.11', // >1.14 introduces a breaking change - see
+                LOMBOK_VERSION               : '1.16.8',
+                ORIKA_VERSION                : '1.4.6',
+                SPRING_IO_VERSION            : '2.0.6.RELEASE',
+                SPRING_REST_EXCEPTION_VERSION: '1.1.1',
+        ]
+]
+
+spec.external = [
+        LOMBOK               : "org.projectlombok:lombok:${spec.versions.LOMBOK_VERSION}",
+
+        JMOCKIT              : "org.jmockit:jmockit:${spec.versions.JMOCKIT_VERSION}",
+
+        ORIKA                : "ma.glasnost.orika:orika-core:${spec.versions.ORIKA_VERSION}",
+
+        SPRING_REST_EXCEPTION: "cz.jirutka.spring:spring-rest-exception-handler:${spec.versions.SPRING_REST_EXCEPTION_VERSION}",
+
+]
+
+spec.spring_boot = [
+        SPRING_BOOT         : "org.springframework.boot:spring-boot-starter",
+        SPRING_BOOT_ACTUATOR: "org.springframework.boot:spring-boot-starter-actuator",
+        SPRING_BOOT_DATA_JPA: "org.springframework.boot:spring-boot-starter-data-jpa",
+        SPRING_BOOT_SECURITY: "org.springframework.boot:spring-boot-starter-security",
+        SPRING_BOOT_TEST    : "org.springframework.boot:spring-boot-starter-test",
+        SPRING_BOOT_WEB     : "org.springframework.boot:spring-boot-starter-web"
+]
+
+spec.spring_io = [
+        COMMONS_COLLECTIONS   : "commons-collections:commons-collections",
+
+        COMMONS_IO            : "commons-io:commons-io",
+
+        COMMONS_LANG          : "commons-lang:commons-lang",
+
+        JACKSON               : ["com.fasterxml.jackson.core:jackson-core",
+                                 "com.fasterxml.jackson.core:jackson-annotations",
+                                 "com.fasterxml.jackson.core:jackson-databind",
+                                 "com.fasterxml.jackson.datatype:jackson-datatype-jdk8",
+                                 "com.fasterxml.jackson.datatype:jackson-datatype-jsr310"],
+
+
+        MOCKITO               : "org.mockito:mockito-core",
+
+        SPRING_SOCIAL         : ["org.springframework.social:spring-social-core",
+                                 "org.springframework.social:spring-social-config",
+                                 "org.springframework.social:spring-social-facebook"],
+
+        SPRING_SOCIAL_SECURITY: ["org.springframework.social:spring-social-security"],
+
+        SPRING_SOCIAL_WEB     : "org.springframework.social:spring-social-web",
+
+        UNIT_TEST             : ["junit:junit:4.12",
+                                 "org.hamcrest:hamcrest-all"]
+]
+
+allprojects {
+    apply plugin: "idea"
+    apply plugin: "java"
+
+    version = "1.0"
+
+    project.buildDir = "build"
+
+    repositories {
+        mavenLocal()
+        jcenter()
+    }
+
+    test {
+        // set heap size for the test JVM(s)
+        minHeapSize = "128m"
+        maxHeapSize = "512m"
+
+    }
+
+
+    tasks.withType(Test) {
+        testLogging {
+            events 'passed', 'failed', 'standard_out', 'standard_error'
+        }
+    }
+
+    apply plugin: "io.spring.dependency-management"
+    dependencyManagement {
+        imports {
+            mavenBom "io.spring.platform:platform-bom:${spec.versions.SPRING_IO_VERSION}"
+        }
+    }
+
+}
+
+
+subprojects {
+    dependencies {
+        compile spec.external.LOMBOK
+        compile spec.external.ORIKA
+
+        compile spec.spring_boot.SPRING_BOOT
+        compile spec.spring_boot.SPRING_BOOT_SECURITY
+
+        compile spec.spring_io.COMMONS_IO
+        compile spec.spring_io.COMMONS_LANG
+        compile spec.spring_io.JACKSON
+
+        testCompile spec.external.JMOCKIT
+        testCompile spec.spring_io.UNIT_TEST
+        testCompile spec.spring_boot.SPRING_BOOT_TEST
+    }
+
+    task allDeps(type: DependencyReportTask) {}
+
+}
+
+project(":hstApp") {
+    apply plugin: 'spring-boot'
+
+    springBoot {
+        executable = true
+    }
+
+    dependencies {
+        compile spec.spring_boot.SPRING_BOOT_ACTUATOR
+        compile spec.spring_boot.SPRING_BOOT_WEB
+        //compile spec.spring_io.SPRING_SOCIAL
+        //compile spec.spring_io.SPRING_SOCIAL_SECURITY
+    }
+}
+
+task('siteuxBuild') << {
+    description = "site-ux cibuild"
+    ext.working_dir = "site-ux"
+    exec {
+        workingDir = working_dir
+        commandLine = ["npm", "prune"]
+    }
+    exec {
+        workingDir = working_dir
+        commandLine = ["npm", "install"]
+    }
+    exec {
+        workingDir = working_dir
+        commandLine = ["grunt", "build"]
+    }
+}
+
+task('siteuxZip', type: Zip, dependsOn: ['siteuxBuild']) {
+    from 'site-ux/site-ux'
+    into 'site-ux'
+    appendix 'site-ux'
+    doLast {
+        ant.checksum file: it.archivePath
+    }
+}
+task('buildall', dependsOn: ['build', 'siteuxZip'])
+
+buildscript {
+    repositories {
+        jcenter()
+        maven { url 'http://dl.bintray.com/cjstehno/public' }
+    }
+    dependencies {
+        classpath "io.spring.gradle:dependency-management-plugin:0.5.6.RELEASE"
+        classpath "org.springframework.boot:spring-boot-gradle-plugin:1.3.5.RELEASE"
+        classpath 'gradle-templates:gradle-templates:1.5'
+    }
+}
+apply plugin: 'templates'
+
+
+repositories {
+    jcenter()
+}
+
+idea {
+    project {
+        jdkName = '1.8'
+        languageLevel = '1.8'
+        ipr {
+            withXml { provider ->
+                provider.node.component.find { it.@name == 'VcsDirectoryMappings' }.mapping.@vcs = 'Git'
+            }
+        }
+    }
+}
+
