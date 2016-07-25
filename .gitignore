@@ -1,0 +1,22 @@
+### Java template
+*.class
+
+# Package Files #
+*.jar
+*.war
+*.ear
+
+
+#IDE
+.idea
+*.iml
+.ipr
+*.ipr
+*.iws
+*.ids
+build
+.gradle
+
+# Site
+site-it/site-it
+*.zip
